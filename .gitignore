@@ -1,0 +1,9 @@
+# Carpetas de compilacion de ESP-IDF
+build/
+
+# Configuraciones locales de VS Code y rutas de cada PC
+.vscode/
+.clangd
+
+# Archivos temporales de configuracion
+sdkconfig.old
