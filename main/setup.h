@@ -41,7 +41,7 @@ typedef enum {
     ESTADO_BARRIDO_ANTIHORARIO
 } estado_sistema_t;
 
-//Prototipo de funciones de setup.c
+//Prototipo de funciones para setup.c
 void setup_inicializar_hardware(void);
 void setup_actualizar_leds(float distancia_cm, bool objeto_detectado);
 
