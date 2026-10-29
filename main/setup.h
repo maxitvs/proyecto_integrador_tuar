@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include "driver/gpio.h"
 
+
 // ---DEFINICIÓN DE PINES DE HARDWARE (GPIO)---
 
 // PD: usamos los define porque no crean una variable en la memoria RAM. Antes de compilar, el preprocesador busca PIN_MOTOR_IN1 y lo reemplaza por GPIO_NUM_18. se usaron los pines más "comodos".
