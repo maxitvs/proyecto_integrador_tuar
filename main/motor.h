@@ -21,7 +21,7 @@ typedef struct{
 } control_motor_t;
 
 
-//Prototipo de funciones para motor.c
+// Prototipo de funciones para motor.c
 void motor_inicializar(control_motor_t *motor);
 void motor_avanzar_paso(control_motor_t *motor, sentido_giro_t direccion);
 void motor_detener(control_motor_t *motor);
