@@ -18,8 +18,8 @@ void motor_inicializar(control_motor_t *motor){
     gpio_set_direction(PIN_MOTOR_IN2, GPIO_MODE_OUTPUT);
 
     // 2. Frenamos el motor
-    gpio_set_level(PIN_MOTOR_IN1 0);
-    gpio_set_level(PIN_MOTOR_IN2 0);
+    gpio_set_level(PIN_MOTOR_IN1, 0);
+    gpio_set_level(PIN_MOTOR_IN2, 0);
 
     // 3. Inicializamos los datos en la estructura original usando el puntero
     if (motor != NULL){ // PD: le ponemos el null para verificar que el puntero apunte a una dirección de memoria válida antes de hacer la modificación

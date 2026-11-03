@@ -16,7 +16,7 @@ void setup_inicializar_hardware(void){ // Configuramos los pines como salidas di
     gpio_reset_pin(PIN_LED_VERDE);
     gpio_reset_pin(PIN_LED_AMARILLO);
     gpio_reset_pin(PIN_LED_ROJO);
-
+    
     // 2. Los configuramos como SALIDA (OUTPUT)
     // PD: definimos el sentido de la corriente (salida en este caso) haciendo que se habiliten sus transistores internos para poder encender los LEDS
     gpio_set_direction(PIN_LED_VERDE, GPIO_MODE_OUTPUT);
@@ -28,6 +28,14 @@ void setup_inicializar_hardware(void){ // Configuramos los pines como salidas di
     gpio_set_level(PIN_LED_VERDE, 0);
     gpio_set_level(PIN_LED_AMARILLO, 0);
     gpio_set_level(PIN_LED_ROJO, 0);
+
+    // 4. Finales de carrera: entradas con pull-up interno (switch cerrado a GND = 0)
+    gpio_reset_pin(PIN_FIN_CARRERA_HORARIO);
+    gpio_reset_pin(PIN_FIN_CARRERA_ANTIHORARIO);
+    gpio_set_direction(PIN_FIN_CARRERA_HORARIO, GPIO_MODE_INPUT);
+    gpio_set_direction(PIN_FIN_CARRERA_ANTIHORARIO, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(PIN_FIN_CARRERA_HORARIO, GPIO_PULLUP_ONLY);
+    gpio_set_pull_mode(PIN_FIN_CARRERA_ANTIHORARIO, GPIO_PULLUP_ONLY);
 }
 
 // ---ENCENDIDO DE LEDS SEGÚN MEDICIÓN---

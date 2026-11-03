@@ -17,6 +17,10 @@
 // Sensor ultrasónico PING (3 pines: VCC, GND y señal bidireccional SIG)
 #define PIN_SENSOR_PING     GPIO_NUM_4
 
+// Finales de carreras, utilizados como limite del pendulo(activos en bajo)
+#define PIN_FIN_CARRERA_HORARIO      GPIO_NUM_25
+#define PIN_FIN_CARRERA_ANTIHORARIO  GPIO_NUM_26
+
 // LEDs (LEDs de rango de detección)
 #define PIN_LED_VERDE       GPIO_NUM_21
 #define PIN_LED_AMARILLO    GPIO_NUM_22
