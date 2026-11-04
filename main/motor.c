@@ -70,3 +70,15 @@ void motor_detener(control_motor_t *motor){
         motor->sentido = GIRO_DETENIDO;
     }
 }
+
+//---FINALES DE CARRERA---
+bool motor_llego_inicio(void)
+{
+    //PD: Devuelve true si el final de carrera de 0° (Inicio) fue presionado (es donde frena cuando viene girando en sentido antihorario)
+    return (gpio_get_level(PIN_FIN_CARRERA_ANTIHORARIO) == 0);
+}
+bool motor_llego_fin(void)
+{
+    // Devuelve true si el final de carrera de 180° (Fin) fue presionado (donde frena cuando viene girando en sentido horario)
+    return (gpio_get_level(PIN_FIN_CARRERA_HORARIO) == 0);
+}

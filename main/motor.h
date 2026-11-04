@@ -1,6 +1,7 @@
 // Tipos de datos del motor (sentido) y prototipos del Puente H
 #ifndef MOTOR_H
 #define MOTOR_H
+#include <stdbool.h>
 
 // ---SENTIDO DE GIRO DEL PUENTE H---
 
@@ -25,5 +26,7 @@ typedef struct{
 void motor_inicializar(control_motor_t *motor);
 void motor_avanzar_paso(control_motor_t *motor, sentido_giro_t direccion);
 void motor_detener(control_motor_t *motor);
+bool motor_llego_inicio(void);
+bool motor_llego_fin(void);
 
 #endif
