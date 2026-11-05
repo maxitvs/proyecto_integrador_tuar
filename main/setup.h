@@ -14,8 +14,9 @@
 #define PIN_MOTOR_IN1       GPIO_NUM_18
 #define PIN_MOTOR_IN2       GPIO_NUM_19
 
-// Sensor ultrasónico PING (3 pines: VCC, GND y señal bidireccional SIG)
-#define PIN_SENSOR_PING     GPIO_NUM_4
+// Sensor ultrasónico PING (4 pines: VCC, GND, Trig, Echo)
+#define PIN_SENSOR_TRIG     GPIO_NUM_4
+#define PIN_SENSOR_ECHO     GPIO_NUM_5
 
 // Finales de carreras, utilizados como limite del pendulo(activos en bajo)
 #define PIN_FIN_CARRERA_HORARIO      GPIO_NUM_25
