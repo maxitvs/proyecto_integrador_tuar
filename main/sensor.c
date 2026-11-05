@@ -14,9 +14,11 @@ static const char *TAG = "SENSOR";
 // Limpiamos y configuramos los pines del motor como SALIDA y frenamos el motor
 void sensor_inicializar(void){
     ESP_LOGI(TAG, "Inicializando pin del sensor PING...");
-    gpio_reset_pin(PIN_SENSOR_PING);
-    gpio_set_direction(PIN_SENSOR_PING, GPIO_MODE_OUTPUT);
-    gpio_set_level(PIN_SENSOR_PING, 0);
+    gpio_reset_pin(PIN_SENSOR_TRIG);
+    gpio_reset_pin(PIN_SENSOR_ECHO);
+    gpio_set_direction(PIN_SENSOR_TRIG, GPIO_MODE_OUTPUT);
+    gpio_set_direction(PIN_SENSOR_ECHO, GPIO_MODE_INPUT);
+    gpio_set_level(PIN_SENSOR_TRIG, 0);
 }
 
 //---LECTURA DEL SENSOR---
@@ -26,21 +28,21 @@ void sensor_inicializar(void){
 float sensor_leer_distancia(datos_sensor_t *datos){
     if (datos == NULL) return 0.0f;
     // 1. Validación y Disparo: PIN en salida y pulso 
-    gpio_set_direction(PIN_SENSOR_PING, GPIO_MODE_OUTPUT);
-    gpio_set_level(PIN_SENSOR_PING, 0);
+    gpio_set_direction(PIN_SENSOR_TRIG, GPIO_MODE_OUTPUT);
+    gpio_set_level(PIN_SENSOR_TRIG, 0);
     ets_delay_us(2);//PD:lo ponemos en 0V por 2 us. para estabilizar la línea
-    gpio_set_level(PIN_SENSOR_PING, 1);
-    ets_delay_us(5);//PD:lo ponemos a 3.3V por 5 us.
-    gpio_set_level(PIN_SENSOR_PING, 0);//PD: lo volvemos a 0V
+    gpio_set_level(PIN_SENSOR_TRIG, 1);
+    ets_delay_us(10);//PD: Pulso de 10 us en Trig
+    gpio_set_level(PIN_SENSOR_TRIG, 0);//PD: lo volvemos a 0V
     //PD: este pulso que generamos le indica al sensor que genere un impulso de ultrasonido
 
     // 2. Lectura: PIN en entrada para escuchar el sensor
-    gpio_set_direction(PIN_SENSOR_PING, GPIO_MODE_INPUT);//PD: en menos de 1 us. cambia a entrada para escuchar
+    gpio_set_direction(PIN_SENSOR_ECHO, GPIO_MODE_INPUT);//PD: en menos de 1 us. cambia a entrada para escuchar
 
     // 3. Espera de detección: 
     //PD: esperamos a que el pulso empiece a emitir y suba a 1 (usamos el timeout por si está desconectado)
     int64_t t_inicio_espera = esp_timer_get_time();//PD:anotamos hora actual en la variable
-    while (gpio_get_level(PIN_SENSOR_PING) == 0){//PD:nos quedamos en el bucle mientras siga en 0
+    while (gpio_get_level(PIN_SENSOR_ECHO) == 0){//PD:nos quedamos en el bucle mientras siga en 0
         if ((esp_timer_get_time() - t_inicio_espera)  > TIMEOUT_ECO_US){//PD:restamos la hora actual al inicio de espera y si pasan más de 30.000 us.(30 ms.) y el pin no sube a 1 entra el if
             ESP_LOGW(TAG, "Time out esperando inicio de pulso (Sensor desconectado o sin respuesta)");//PD:avisa por consola la advertencia
             datos->distancia_cm = 0.0f;
@@ -53,7 +55,7 @@ float sensor_leer_distancia(datos_sensor_t *datos){
     //PD: cronometramos el viaje del sonido en al aire mientras el pin vale 1
     int64_t t_inicio_pulso = esp_timer_get_time();//PD:en el instante en el que el bucle anterior termina el pin sube a 1 (el sonido acaba de salir al aire), por lo que guardamos ese instante en la variable.
     //PD: el sensor mantiene el pin en 1 durante todo el tiempo en que el sonido viaje por el aire, choca contra un objeto y vuelve. Mientras esté en 1 el segundo while espera
-    while (gpio_get_level(PIN_SENSOR_PING) == 1){
+    while (gpio_get_level(PIN_SENSOR_ECHO) == 1){
         if((esp_timer_get_time() - t_inicio_pulso) > TIMEOUT_ECO_US){//PD:si pasan más de 30 ms. con el pin en 1 y no se detecta nada significa que no hay objeto
             ESP_LOGI(TAG, "Camino despejado (eco fuera de rango máximo)");
             datos->distancia_cm = 999.0f;//PD: marca el máximo, no detecta nada y sale
