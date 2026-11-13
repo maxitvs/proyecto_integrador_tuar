@@ -1,4 +1,4 @@
-// Máquina de estados principal y coordinación
+﻿// Máquina de estados principal y coordinación general del Radar
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -10,86 +10,117 @@
 
 static const char *TAG = "MAIN";
 
-//Tiempo que se engergiza el motor en cada paso (ajustable según velocidad de motor)
-#define TIEMPO_PASO_MS 150
-// Pausa con el motor detenido para estabilizar y medir
-#define TIEMPO_LECTURA_MS 350
+void app_main(void) {
+    estado_sistema_t estado_actual = ESTADO_INICIALIZACION;
+    sentido_giro_t direccion_barrido = GIRO_HORARIO;
 
-void app_main(void){
-    // Variables de estado y estructuras del sistema
-    estado_sistema_t estado_actual = ESTADO_INICIALIZACION; //PD: cpm estado_actual en inicialización lo primero que va a hacer es configurar los pines
-    sentido_giro_t direccion_barrido = GIRO_HORARIO;//PD: la dirección para recordar en que sentido estaba girando antes de frenar
-
-    //PD: son las 2 estructuras en donde se guardan el ángulo actual y la distancia en la RAM
     control_motor_t mi_motor;
     datos_sensor_t mi_sensor;
 
-    while(1){ //PD: es el bucle infitio que nunca debe terminar para este sistema embebido. En cada vuelta el switch mira que valor tiene estado actual y entra en el case correspondiente
-        switch(estado_actual){
-            case ESTADO_INICIALIZACION://PD: configura todo, fija el sentido inicial a horario y cambia a estado lectura para que en la próxima vuelta vaya a medir directo en 0°
-                ESP_LOGI(TAG, "=== INICIANDO SISTEMA DE RADAR");
+    while (1) {
+        switch (estado_actual) {
+
+            case ESTADO_INICIALIZACION:
+                ESP_LOGI(TAG, "=== INICIANDO SISTEMA DE RADAR ===");
                 setup_inicializar_hardware();
                 motor_inicializar(&mi_motor);
                 sensor_inicializar();
 
+                // Corrección 3: Verificación de posición inicial (0° activado y 180° libre)
+                ESP_LOGI(TAG, "Verificando posicion inicial (0°)...");
+                while (!motor_llego_inicio() || motor_llego_fin()) {
+                    ESP_LOGW(TAG, "Posicione manualmente el radar en el tope de 0° (Inicio) para comenzar...");
+                    vTaskDelay(pdMS_TO_TICKS(1000));
+                }
+
+                ESP_LOGI(TAG, "Posicion inicial 0° confirmada. Iniciando barrido...");
                 direccion_barrido = GIRO_HORARIO;
+                mi_motor.paso_actual = 0;
+                mi_motor.tiempo_recorrido_ms = 0;
                 estado_actual = ESTADO_LECTURA;
                 break;
 
-            case ESTADO_LECTURA://PD: PRIMERA PARTE: medir y mostrar: motor quieto le pasamos el mi sensor a leer distancia para que mida y guarde el resultado ahí. Le paso esto actualizar leds, imprimimos en consola
-                // 1. Medimos distancia con el motor detenido y actualizamos LEDs
+            case ESTADO_LECTURA:
+                // 1. Medimos distancia con el motor detenido y actualizamos LEDs según las 3 situaciones
                 sensor_leer_distancia(&mi_sensor);
-                setup_actualizar_leds(mi_sensor.distancia_cm, mi_sensor.objeto_detectado);
+                setup_actualizar_leds(mi_sensor.distancia_cm, mi_sensor.estado);
 
-                ESP_LOGI(TAG, "Reporte -> Angulo: %d° | Distancia: %.2f cm | Objeto: %s",
-                    mi_motor.angulo_actual, 
-                    mi_sensor.distancia_cm, 
-                    mi_sensor.objeto_detectado ? "SI" : "NO");
+                if (mi_sensor.estado == SENSOR_OBJETO_DETECTADO) {
+                    ESP_LOGI(TAG, "Reporte [Paso %d] -> Distancia: %.2f cm | Estado: OBJETO DETECTADO",
+                             mi_motor.paso_actual, mi_sensor.distancia_cm);
+                } else if (mi_sensor.estado == SENSOR_SIN_OBJETO) {
+                    ESP_LOGI(TAG, "Reporte [Paso %d] -> Estado: ZONA DESPEJADA (Fuera de rango)",
+                             mi_motor.paso_actual);
+                } else {
+                    ESP_LOGE(TAG, "Reporte [Paso %d] -> Estado: ERROR DE LECTURA DEL SENSOR",
+                             mi_motor.paso_actual);
+                }
 
-                vTaskDelay(pdMS_TO_TICKS(TIEMPO_LECTURA_MS));//PD:espera 350 ms.
-                
-                //PD: SEGUNDA PARTE: decisión de movimiento: si venía en sentido HORARIO pregunta si chocó con un fin de carrera o si la cuenta matemática llegó a 180°. Si no avanza; si si recalibra el ángulo en 180° e invierte a antihorario. Si venía en sentido ANTIHORARIO hace exactamente lo opuesto preguntando si chocó un fin o si el ángulo dió 0°
-                // 2. Evaluamos finales de carrera y límites angulares para decidir el próximo movimiento
-                if(direccion_barrido == GIRO_HORARIO){
-                    if(motor_llego_fin() || mi_motor.angulo_actual >= ANGULO_MAXIMO){
-                        ESP_LOGI(TAG, "Tope HORARIO alcanzado (180°). Invirtiendo sentido...");
-                        mi_motor.angulo_actual = ANGULO_MAXIMO;
+                vTaskDelay(pdMS_TO_TICKS(TIEMPO_LECTURA_MS));
+
+                // 2. Corrección 4: Cambio de sentido gobernado exclusivamente por los finales de carrera físicos
+                if (direccion_barrido == GIRO_HORARIO) {
+                    if (motor_llego_fin()) {
+                        ESP_LOGI(TAG, "Tope fisico HORARIO (180°) alcanzado. Invirtiendo sentido...");
                         direccion_barrido = GIRO_ANTIHORARIO;
+                        mi_motor.paso_actual = 0;
+                        mi_motor.tiempo_recorrido_ms = 0; // Reiniciamos el cronómetro de protección
                         estado_actual = ESTADO_BARRIDO_ANTIHORARIO;
-                    } else{
+                    } else {
                         estado_actual = ESTADO_BARRIDO_HORARIO;
                     }
-                } else{
-                    if(motor_llego_inicio() || mi_motor.angulo_actual <= ANGULO_MINIMO){
-                        ESP_LOGI(TAG, "Tope ANTIHORARIO alcanzado (0°). Invirtiendo sentido...");
-                        mi_motor.angulo_actual = ANGULO_MINIMO;
+                } else {
+                    if (motor_llego_inicio()) {
+                        ESP_LOGI(TAG, "Tope fisico ANTIHORARIO (0°) alcanzado. Invirtiendo sentido...");
                         direccion_barrido = GIRO_HORARIO;
+                        mi_motor.paso_actual = 0;
+                        mi_motor.tiempo_recorrido_ms = 0; // Reiniciamos el cronómetro de protección
                         estado_actual = ESTADO_BARRIDO_HORARIO;
-                    } else{
+                    } else {
                         estado_actual = ESTADO_BARRIDO_ANTIHORARIO;
                     }
                 }
                 break;
 
-                //PD: energiza el puente y suma o resta 15° llamando a motor avanzar. El motor gira 150 ms. se detiene y cambia a estado lectura para que en la siguiente vuelta el while vuelva a medir en esta nueva posición.
             case ESTADO_BARRIDO_HORARIO:
-                motor_avanzar_paso(&mi_motor, GIRO_HORARIO);
-                vTaskDelay(pdMS_TO_TICKS(TIEMPO_PASO_MS));
-                motor_detener(&mi_motor);
+                // Ejecuta el paso vigilando el final de carrera cada 10 ms
+                motor_ejecutar_paso(&mi_motor, GIRO_HORARIO);
 
-                estado_actual = ESTADO_LECTURA;
+                // Corrección 5: Protección por tiempo máximo de recorrido
+                if (mi_motor.tiempo_recorrido_ms >= TIEMPO_MAX_RECORRIDO_MS && !motor_llego_fin()) {
+                    ESP_LOGE(TAG, "PROTECCION ACTIVADA: Tiempo maximo excedido (%d ms) sin detectar fin de carrera de 180°",
+                             mi_motor.tiempo_recorrido_ms);
+                    estado_actual = ESTADO_ERROR;
+                } else {
+                    estado_actual = ESTADO_LECTURA;
+                }
                 break;
 
             case ESTADO_BARRIDO_ANTIHORARIO:
-                motor_avanzar_paso(&mi_motor, GIRO_ANTIHORARIO);
-                vTaskDelay(pdMS_TO_TICKS(TIEMPO_PASO_MS));
-                motor_detener(&mi_motor);
+                // Ejecuta el paso vigilando el final de carrera cada 10 ms
+                motor_ejecutar_paso(&mi_motor, GIRO_ANTIHORARIO);
 
-                estado_actual = ESTADO_LECTURA;
+                // Corrección 5: Protección por tiempo máximo de recorrido
+                if (mi_motor.tiempo_recorrido_ms >= TIEMPO_MAX_RECORRIDO_MS && !motor_llego_inicio()) {
+                    ESP_LOGE(TAG, "PROTECCION ACTIVADA: Tiempo maximo excedido (%d ms) sin detectar fin de carrera de 0°",
+                             mi_motor.tiempo_recorrido_ms);
+                    estado_actual = ESTADO_ERROR;
+                } else {
+                    estado_actual = ESTADO_LECTURA;
+                }
                 break;
-            default://PD:si hay algún ruido eléctrico o falla de memoria el estado actual toma un valor invalido el default lo reinicia
+
+            case ESTADO_ERROR:
+                // Desactiva inmediatamente el motor y deja señal lumínica de falla
+                motor_detener(&mi_motor);
+                setup_indicar_error_hardware();
+                ESP_LOGE(TAG, "SISTEMA DETENIDO POR SEGURIDAD. Verifique finales de carrera o traba mecanica y reinicie el ESP32.");
+                vTaskDelay(pdMS_TO_TICKS(2000));
+                break;
+
+            default:
                 estado_actual = ESTADO_INICIALIZACION;
-                break;    
+                break;
         }
     }
 }

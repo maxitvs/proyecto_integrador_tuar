@@ -1,30 +1,28 @@
-// Tipos de datos del motor (sentido) y prototipos del Puente H
+﻿// Tipos de datos del motor y prototipos del Puente H
 #ifndef MOTOR_H
 #define MOTOR_H
+
 #include <stdbool.h>
 
-// ---SENTIDO DE GIRO DEL PUENTE H---
-
-//PD: para manejar el puente H con los 2 pines que definimos en setup.h el motor va a tener 3 estados posibles: detenido (pines en 0V), giro horario (IN1 = 1 | IN2 = 0) y giro antihorario (IN1 = 0 | IN2= 1)
-typedef enum{
+// --- SENTIDO DE GIRO DEL PUENTE H ---
+typedef enum {
     GIRO_DETENIDO = 0,
     GIRO_HORARIO,
     GIRO_ANTIHORARIO
 } sentido_giro_t;
 
-
-//---ESTRUCTURA DE ESTADO ACTUAL DEL MOTOR---
-
-//PD: usamos una estructura porque para que el radar sepa donde está parado y hacia donde se mueve usamos 2 tipos distintos de datos
-typedef struct{
-    int angulo_actual;
+// --- ESTRUCTURA DE ESTADO ACTUAL DEL MOTOR ---
+// Correcciones 1 y 5: Eliminamos el ángulo estimado ficticio y llevamos
+// el control del tiempo acumulado de recorrido para proteger el mecanismo.
+typedef struct {
     sentido_giro_t sentido;
+    int paso_actual;          // Contador referencial de paradas realizadas en el barrido
+    int tiempo_recorrido_ms;  // Tiempo total acumulado viajando en el sentido actual
 } control_motor_t;
 
-
-// Prototipo de funciones para motor.c
+// Prototipos de funciones para motor.c
 void motor_inicializar(control_motor_t *motor);
-void motor_avanzar_paso(control_motor_t *motor, sentido_giro_t direccion);
+bool motor_ejecutar_paso(control_motor_t *motor, sentido_giro_t direccion);
 void motor_detener(control_motor_t *motor);
 bool motor_llego_inicio(void);
 bool motor_llego_fin(void);

@@ -1,18 +1,24 @@
-// Estructura de medición y prototipos del sensor PING
+﻿// Estructura de medición y prototipos del sensor ultrasónico (4 pines)
 #ifndef SENSOR_H
 #define SENSOR_H
 
 #include <stdbool.h>
 
-//---ESTRUCTURA PARA ALMACENAR LECTURA DEL SENSOR---
-//PD: creamos esta estructura para que nos quede la función que necesitamos, donde usamos esos dos variables que siempre van a ir juntas, en un mismo paquete
-typedef struct{
-    float distancia_cm;//PD:guardamos los datos en en cm (con coma) que obtiene el sensor
-    bool objeto_detectado;//PD: true si el eco ultrasónico rebotó contra algo dentro del rango válido o false si el pulso se perdió en el espacio al no chocar contra nada en el rango
+// Corrección 6: Diferenciamos las tres situaciones posibles en la lectura
+typedef enum {
+    SENSOR_OBJETO_DETECTADO = 0, // Rebote válido dentro del rango
+    SENSOR_SIN_OBJETO,           // Camino despejado (eco fuera de rango máximo)
+    SENSOR_ERROR_LECTURA         // Falla de hardware: el pin Echo nunca subió a 1
+} estado_sensor_t;
+
+// --- ESTRUCTURA PARA ALMACENAR LECTURA DEL SENSOR ---
+typedef struct {
+    float distancia_cm;
+    estado_sensor_t estado;
 } datos_sensor_t;
 
-// Prototipo de las funciones para sensor.c
-void sensor_inicializar(void);//PD:el segundo void indica que no necesita recibir ningún dato para funcionar porque ya sabe que pin configurar leyéndolo desde setup.h
-float sensor_leer_distancia(datos_sensor_t *datos);
+// Prototipos de las funciones para sensor.c
+void sensor_inicializar(void);
+estado_sensor_t sensor_leer_distancia(datos_sensor_t *datos);
 
 #endif
