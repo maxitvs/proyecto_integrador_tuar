@@ -5,7 +5,7 @@
 
 // ---SENTIDO DE GIRO DEL PUENTE H---
 
-//PD: para manejar el puente H con los 2 pines que definimos en setup.h el motor va a tener 3 estados posibles: detenido (pines en 0V), giro horario (IN1 = 1 | IN2 = 0) y giro antihorario (IN1 = 0 | IN2= 1)
+//PD: el puente H usa 4 transistores (Q1/Q2 = BC327 PNP activos en 0, Q3/Q4 = 2N2222 NPN activos en 1). Estados: detenido (Q1=1 Q2=1 Q3=0 Q4=0), giro horario (Q1+Q4 activos) y giro antihorario (Q2+Q3 activos)
 typedef enum{
     GIRO_DETENIDO = 0,
     GIRO_HORARIO,

@@ -2,7 +2,10 @@
 #include "setup.h"
 #include "esp_log.h"
 
-static const char *TAG = "SETUP"; // PD: static para que este TAG (variable global) sea privada para este archivo setup.c ya que usamos TAG también en otros archivos. el TAG va a ser usado por el ESP32 para armar el encabezado de una línea que nos devuelve en la terminal por ejemplo: "I (340) SETUP: Configurando pines de LEDs indicadores..." esto nos sirve ya que teniendo varios archivos .c podemos mirar esa palabra en mayúscula que nos dice al instante que arhivo .c generó el mensaje o falla.
+static const char *TAG = "SETUP"; // PD: static para que este TAG (variable global) sea privada para este archivo setup.c
+// ya que usamos TAG también en otros archivos. el TAG va a ser usado por el ESP32 para armar el encabezado de una línea que nos devuelve
+// en la terminal por ejemplo: "I (340) SETUP: Configurando pines de LEDs indicadores..." esto nos sirve ya que teniendo varios archivos .c 
+//podemos mirar esa palabra en mayúscula que nos dice al instante que arhivo .c generó el mensaje o falla.
 
 
 // ---CONFIGURACIÓN DE PINES LEDS---
@@ -29,7 +32,7 @@ void setup_inicializar_hardware(void){ // Configuramos los pines como salidas di
     gpio_set_level(PIN_LED_AMARILLO, 0);
     gpio_set_level(PIN_LED_ROJO, 0);
 
-    // 4. Finales de carrera: entradas con pull-up interno (switch cerrado a GND = 0)
+    // 4. Finales de carrera: entradas con pull-up interno. Cableado COM + NC: en reposo el contacto cierra a GND (0), al presionarse se abre y el pull-up lo sube a 1
     gpio_reset_pin(PIN_FIN_CARRERA_HORARIO);
     gpio_reset_pin(PIN_FIN_CARRERA_ANTIHORARIO);
     gpio_set_direction(PIN_FIN_CARRERA_HORARIO, GPIO_MODE_INPUT);

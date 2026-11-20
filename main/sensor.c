@@ -3,7 +3,7 @@
 #include "setup.h"
 #include "esp_log.h"
 #include "esp_timer.h"//PD: da acceso a un timer que cuenta los ms. desde que se encendió el ESP
-#include "rom/ets_sys.h"//PD: da acceso a una pausa en ms. grabada den la memoria ROM de fábrica del ESP
+#include "esp_rom_sys.h"//PD: da acceso a esp_rom_delay_us(), una pausa en microsegundos grabada en la ROM del ESP
 
 static const char *TAG = "SENSOR";
 #define TIMEOUT_ECO_US 30000//PD:definimos un tope de espera de 30.000 us. (30 ms.). Como el sonido recorre 5 mts. en 30 ms (más que el alcance que le pusimos al sensor), si pasa ese tiempo y no hay respuesta sabemos o que está desconectado o que el sonido se perdió en el aire sin rebotar en nada.
@@ -20,7 +20,7 @@ void sensor_inicializar(void){
     gpio_set_direction(PIN_SENSOR_ECHO, GPIO_MODE_INPUT);
     gpio_set_level(PIN_SENSOR_TRIG, 0);
 }
-
+    
 //---LECTURA DEL SENSOR---
 
 // Leemos distancia en cada frenado en 5 etapas
@@ -30,9 +30,9 @@ float sensor_leer_distancia(datos_sensor_t *datos){
     // 1. Validación y Disparo: PIN en salida y pulso 
     gpio_set_direction(PIN_SENSOR_TRIG, GPIO_MODE_OUTPUT);
     gpio_set_level(PIN_SENSOR_TRIG, 0);
-    ets_delay_us(2);//PD:lo ponemos en 0V por 2 us. para estabilizar la línea
+    esp_rom_delay_us(2);//PD:lo ponemos en 0V por 2 us. para estabilizar la línea
     gpio_set_level(PIN_SENSOR_TRIG, 1);
-    ets_delay_us(10);//PD: Pulso de 10 us en Trig
+    esp_rom_delay_us(10);//PD: Pulso de 10 us en Trig
     gpio_set_level(PIN_SENSOR_TRIG, 0);//PD: lo volvemos a 0V
     //PD: este pulso que generamos le indica al sensor que genere un impulso de ultrasonido
 

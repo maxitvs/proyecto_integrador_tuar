@@ -14,6 +14,8 @@ static const char *TAG = "MAIN";
 #define TIEMPO_PASO_MS 150
 // Pausa con el motor detenido para estabilizar y medir
 #define TIEMPO_LECTURA_MS 350
+// Pausa con el motor detenido en cada extremo (0° y 180°) antes de invertir el sentido: evita la conducción simultánea del puente H
+#define TIEMPO_PARADA_EXTREMO_MS 1000
 
 void app_main(void){
     // Variables de estado y estructuras del sistema
@@ -53,6 +55,8 @@ void app_main(void){
                 if(direccion_barrido == GIRO_HORARIO){
                     if(motor_llego_fin() || mi_motor.angulo_actual >= ANGULO_MAXIMO){
                         ESP_LOGI(TAG, "Tope HORARIO alcanzado (180°). Invirtiendo sentido...");
+                        motor_detener(&mi_motor);//PD: puente apagado (solo BC327 con tensión) durante toda la pausa
+                        vTaskDelay(pdMS_TO_TICKS(TIEMPO_PARADA_EXTREMO_MS));
                         mi_motor.angulo_actual = ANGULO_MAXIMO;
                         direccion_barrido = GIRO_ANTIHORARIO;
                         estado_actual = ESTADO_BARRIDO_ANTIHORARIO;
@@ -62,6 +66,8 @@ void app_main(void){
                 } else{
                     if(motor_llego_inicio() || mi_motor.angulo_actual <= ANGULO_MINIMO){
                         ESP_LOGI(TAG, "Tope ANTIHORARIO alcanzado (0°). Invirtiendo sentido...");
+                        motor_detener(&mi_motor);
+                        vTaskDelay(pdMS_TO_TICKS(TIEMPO_PARADA_EXTREMO_MS));
                         mi_motor.angulo_actual = ANGULO_MINIMO;
                         direccion_barrido = GIRO_HORARIO;
                         estado_actual = ESTADO_BARRIDO_HORARIO;
