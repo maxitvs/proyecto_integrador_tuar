@@ -1,4 +1,4 @@
-// Tipos de datos del motor (sentido) y prototipos del Puente H
+﻿// Tipos de datos del motor (sentido) y prototipos del Puente H
 #ifndef MOTOR_H
 #define MOTOR_H
 #include <stdbool.h>
@@ -15,9 +15,8 @@ typedef enum{
 
 //---ESTRUCTURA DE ESTADO ACTUAL DEL MOTOR---
 
-//PD: usamos una estructura porque para que el radar sepa donde está parado y hacia donde se mueve usamos 2 tipos distintos de datos
+//PD: guarda hacia donde se está moviendo el motor en este momento
 typedef struct{
-    int angulo_actual;
     sentido_giro_t sentido;
 } control_motor_t;
 

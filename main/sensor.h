@@ -1,4 +1,4 @@
-// Estructura de medición y prototipos del sensor PING
+﻿// Estructura de medición y prototipos del sensor PING
 #ifndef SENSOR_H
 #define SENSOR_H
 
