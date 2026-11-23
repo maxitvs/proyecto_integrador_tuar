@@ -1,4 +1,5 @@
-// Máquina de estados principal y coordinación
+﻿// Radar con ESP32 - el motor se mueve por pasos
+// Idea: el motor gira unos ms. Si toca un final de carrera, gira al otro lado.
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -10,92 +11,119 @@
 
 static const char *TAG = "MAIN";
 
-//Tiempo que se engergiza el motor en cada paso (ajustable según velocidad de motor)
-#define TIEMPO_PASO_MS 150
-// Pausa con el motor detenido para estabilizar y medir
-#define TIEMPO_LECTURA_MS 350
-// Pausa con el motor detenido en cada extremo (0° y 180°) antes de invertir el sentido: evita la conducción simultánea del puente H
-#define TIEMPO_PARADA_EXTREMO_MS 1000
+// ---TIEMPOS (se pueden ajustar, todos en ms)---
+#define TIEMPO_PASO_MS 230            // cuánto gira el motor en cada paso
+#define TIEMPO_LECTURA_MS 600         // espera con el motor detenido antes de medir
+#define TIEMPO_PARADA_EXTREMO_MS 600  // espera al tocar un final de carrera, antes de girar al otro lado
+#define TIEMPO_ESPERA_OBJETO_MS 200   // cada cuánto se mide de nuevo mientras hay un objeto cerca
+
+// Muestra por el monitor serial lo que midió el sensor.
+// Recibe un PUNTERO (*) a la estructura: no copia los datos, solo recibe la dirección de memoria donde están.
+// Con la flecha (->) se accede a cada dato a través del puntero.
+static void mostrar_reporte(const datos_sensor_t *sensor){
+    ESP_LOGI(TAG, "Reporte -> Distancia: %.2f cm | Objeto: %s",
+        sensor->distancia_cm,
+        sensor->objeto_detectado ? "SI" : "NO");
+}
 
 void app_main(void){
-    // Variables de estado y estructuras del sistema
-    estado_sistema_t estado_actual = ESTADO_INICIALIZACION; //PD: cpm estado_actual en inicialización lo primero que va a hacer es configurar los pines
-    sentido_giro_t direccion_barrido = GIRO_HORARIO;//PD: la dirección para recordar en que sentido estaba girando antes de frenar
+    estado_sistema_t estado_actual = ESTADO_INICIALIZACION;
+    sentido_giro_t direccion = GIRO_HORARIO;   // hacia dónde está girando el péndulo
+    bool toco_final = false;                   // true si el paso terminó en un final de carrera
+    int tiempo_ms = 0;                         // cuánto lleva girando el paso actual
 
-    //PD: son las 2 estructuras en donde se guardan el ángulo actual y la distancia en la RAM
+    // Estructuras donde se guardan el estado del motor y la medición del sensor.
+    // A las funciones se las pasamos con & (dirección de memoria) y ellas reciben un puntero para poder modificarlas.
     control_motor_t mi_motor;
     datos_sensor_t mi_sensor;
 
-    while(1){ //PD: es el bucle infitio que nunca debe terminar para este sistema embebido. En cada vuelta el switch mira que valor tiene estado actual y entra en el case correspondiente
+    while(1){
         switch(estado_actual){
-            case ESTADO_INICIALIZACION://PD: configura todo, fija el sentido inicial a horario y cambia a estado lectura para que en la próxima vuelta vaya a medir directo en 0°
+
+            case ESTADO_INICIALIZACION:
+                // Configura todo y empieza girando en sentido horario
                 ESP_LOGI(TAG, "=== INICIANDO SISTEMA DE RADAR");
                 setup_inicializar_hardware();
-                motor_inicializar(&mi_motor);
+                motor_inicializar(&mi_motor);   // &mi_motor = puntero a la estructura del motor
                 sensor_inicializar();
 
-                direccion_barrido = GIRO_HORARIO;
-                estado_actual = ESTADO_LECTURA;
+                direccion = GIRO_HORARIO;
+                estado_actual = ESTADO_BARRIDO_HORARIO;
                 break;
 
-            case ESTADO_LECTURA://PD: PRIMERA PARTE: medir y mostrar: motor quieto le pasamos el mi sensor a leer distancia para que mida y guarde el resultado ahí. Le paso esto actualizar leds, imprimimos en consola
-                // 1. Medimos distancia con el motor detenido y actualizamos LEDs
-                sensor_leer_distancia(&mi_sensor);
-                setup_actualizar_leds(mi_sensor.distancia_cm, mi_sensor.objeto_detectado);
-
-                ESP_LOGI(TAG, "Reporte -> Angulo: %d° | Distancia: %.2f cm | Objeto: %s",
-                    mi_motor.angulo_actual, 
-                    mi_sensor.distancia_cm, 
-                    mi_sensor.objeto_detectado ? "SI" : "NO");
-
-                vTaskDelay(pdMS_TO_TICKS(TIEMPO_LECTURA_MS));//PD:espera 350 ms.
-                
-                //PD: SEGUNDA PARTE: decisión de movimiento: si venía en sentido HORARIO pregunta si chocó con un fin de carrera o si la cuenta matemática llegó a 180°. Si no avanza; si si recalibra el ángulo en 180° e invierte a antihorario. Si venía en sentido ANTIHORARIO hace exactamente lo opuesto preguntando si chocó un fin o si el ángulo dió 0°
-                // 2. Evaluamos finales de carrera y límites angulares para decidir el próximo movimiento
-                if(direccion_barrido == GIRO_HORARIO){
-                    if(motor_llego_fin() || mi_motor.angulo_actual >= ANGULO_MAXIMO){
-                        ESP_LOGI(TAG, "Tope HORARIO alcanzado (180°). Invirtiendo sentido...");
-                        motor_detener(&mi_motor);//PD: puente apagado (solo BC327 con tensión) durante toda la pausa
-                        vTaskDelay(pdMS_TO_TICKS(TIEMPO_PARADA_EXTREMO_MS));
-                        mi_motor.angulo_actual = ANGULO_MAXIMO;
-                        direccion_barrido = GIRO_ANTIHORARIO;
-                        estado_actual = ESTADO_BARRIDO_ANTIHORARIO;
-                    } else{
-                        estado_actual = ESTADO_BARRIDO_HORARIO;
-                    }
-                } else{
-                    if(motor_llego_inicio() || mi_motor.angulo_actual <= ANGULO_MINIMO){
-                        ESP_LOGI(TAG, "Tope ANTIHORARIO alcanzado (0°). Invirtiendo sentido...");
-                        motor_detener(&mi_motor);
-                        vTaskDelay(pdMS_TO_TICKS(TIEMPO_PARADA_EXTREMO_MS));
-                        mi_motor.angulo_actual = ANGULO_MINIMO;
-                        direccion_barrido = GIRO_HORARIO;
-                        estado_actual = ESTADO_BARRIDO_HORARIO;
-                    } else{
-                        estado_actual = ESTADO_BARRIDO_ANTIHORARIO;
-                    }
-                }
-                break;
-
-                //PD: energiza el puente y suma o resta 15° llamando a motor avanzar. El motor gira 150 ms. se detiene y cambia a estado lectura para que en la siguiente vuelta el while vuelva a medir en esta nueva posición.
             case ESTADO_BARRIDO_HORARIO:
+                // Gira en sentido horario hasta que pase el tiempo del paso o toque el final de carrera
                 motor_avanzar_paso(&mi_motor, GIRO_HORARIO);
-                vTaskDelay(pdMS_TO_TICKS(TIEMPO_PASO_MS));
-                motor_detener(&mi_motor);
+                tiempo_ms = 0;
+                toco_final = false;
 
+                while(tiempo_ms < TIEMPO_PASO_MS && !toco_final){
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                    tiempo_ms += 10;
+                    toco_final = motor_llego_fin();
+                }
+
+                motor_detener(&mi_motor);
                 estado_actual = ESTADO_LECTURA;
                 break;
 
             case ESTADO_BARRIDO_ANTIHORARIO:
+                // Gira en sentido antihorario hasta que pase el tiempo del paso o toque el final de carrera
                 motor_avanzar_paso(&mi_motor, GIRO_ANTIHORARIO);
-                vTaskDelay(pdMS_TO_TICKS(TIEMPO_PASO_MS));
-                motor_detener(&mi_motor);
+                tiempo_ms = 0;
+                toco_final = false;
 
+                while(tiempo_ms < TIEMPO_PASO_MS && !toco_final){
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                    tiempo_ms += 10;
+                    toco_final = motor_llego_inicio();
+                }
+
+                motor_detener(&mi_motor);
                 estado_actual = ESTADO_LECTURA;
                 break;
-            default://PD:si hay algún ruido eléctrico o falla de memoria el estado actual toma un valor invalido el default lo reinicia
+
+            case ESTADO_LECTURA:
+                // 1. Con el motor detenido, esperamos que el péndulo se estabilice y medimos
+                vTaskDelay(pdMS_TO_TICKS(TIEMPO_LECTURA_MS));
+                sensor_leer_distancia(&mi_sensor);   // el sensor guarda el resultado en mi_sensor a través del puntero
+                setup_actualizar_leds(mi_sensor.distancia_cm, mi_sensor.objeto_detectado);
+                mostrar_reporte(&mi_sensor);
+
+                // 2. Mientras haya un objeto a menos de 40 cm, el motor sigue detenido y volvemos a medir
+                while(mi_sensor.objeto_detectado && mi_sensor.distancia_cm < UMBRAL_MEDIO_CM){
+                    ESP_LOGI(TAG, "Objeto a %.2f cm -> barrido en pausa", mi_sensor.distancia_cm);
+                    vTaskDelay(pdMS_TO_TICKS(TIEMPO_ESPERA_OBJETO_MS));
+                    sensor_leer_distancia(&mi_sensor);
+                    setup_actualizar_leds(mi_sensor.distancia_cm, mi_sensor.objeto_detectado);
+                }
+
+                // 3. Si tocó un final de carrera, espera y cambia de sentido
+                if(toco_final){
+                    if(direccion == GIRO_HORARIO){
+                        ESP_LOGI(TAG, "Final de carrera HORARIO alcanzado. Invirtiendo sentido...");
+                        vTaskDelay(pdMS_TO_TICKS(TIEMPO_PARADA_EXTREMO_MS));
+                        direccion = GIRO_ANTIHORARIO;
+                    } else{
+                        ESP_LOGI(TAG, "Final de carrera ANTIHORARIO alcanzado. Invirtiendo sentido...");
+                        vTaskDelay(pdMS_TO_TICKS(TIEMPO_PARADA_EXTREMO_MS));
+                        direccion = GIRO_HORARIO;
+                    }
+                }
+
+                // 4. Siguiente paso en el sentido que corresponda
+                if(direccion == GIRO_HORARIO){
+                    estado_actual = ESTADO_BARRIDO_HORARIO;
+                } else{
+                    estado_actual = ESTADO_BARRIDO_ANTIHORARIO;
+                }
+                break;
+
+            default:
+                // Si el estado toma un valor inválido, frena el motor y reinicia
+                motor_detener(&mi_motor);
                 estado_actual = ESTADO_INICIALIZACION;
-                break;    
+                break;
         }
     }
 }
